@@ -3,6 +3,7 @@ use crate::core::connection::DBConn;
 use crate::ts_generator::generator::generate_ts_interface;
 use crate::ts_generator::types::ts_query::TsQuery;
 use color_eyre::eyre::Result;
+use regex::{self, Regex};
 use std::borrow::BorrowMut;
 
 use swc_common::errors::Handler;
@@ -17,12 +18,23 @@ pub fn prepare(
 ) -> Result<(bool, Option<TsQuery>)> {
     let mut failed = false;
 
-    let mut conn = match &db_conn {
+    let conn = match &db_conn {
         DBConn::PostgresConn(conn) => conn,
         _ => panic!("Invalid connection type"),
     };
     let span = sql.span.to_owned();
-    let prepare_query = format!("PREPARE sqlx_stmt AS {}", sql.query);
+
+    // Match the $/name/ pattern and replace it with $1, $2, etc.
+    let re = Regex::new(r"\$\/[A-z]+\/").unwrap();
+    let mut index = 0;
+    let replaced = re.replace_all(&sql.query, |_caps: &regex::Captures| {
+        index += 1;
+        format!("${}", index)
+    });
+
+    let query = replaced.to_string();
+    let prepare_query = format!("PREPARE sqlx_stmt AS {}", query);
+
     let result = conn.lock().unwrap().borrow_mut().query(prepare_query.as_str(), &[]);
 
     if let Err(e) = result {
