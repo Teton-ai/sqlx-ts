@@ -25,7 +25,7 @@ pub fn prepare(
     let span = sql.span.to_owned();
 
     // Match the $/name/ pattern and replace it with $1, $2, etc.
-    let re = Regex::new(r"\$\/[A-z]+\/").unwrap();
+    let re = Regex::new(r"\$\/[A-Za-z0-9_]+(:[A-Za-z]+)?\/").unwrap();
     let mut index = 0;
     let replaced = re.replace_all(&sql.query, |_caps: &regex::Captures| {
         index += 1;
